@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"qiushibaike.com/vue/data"
+	"qiushibaike.com/test-go/data"
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 		fmt.Println(err)
 	}
 
-	test_two, err := data.GetMaterialById(3)
+	test_two, err := data.GetMaterialById(1)
 	fmt.Println(test_two, err)
 
 }

@@ -77,6 +77,46 @@ func InsertMaterial(material *Material) error {
 	return err
 }
 
+func DelMaterialById(materialId int) bool {
+	deleteSQL := "DELETE FROM material_library WHERE id = ?"
+	_, err := db.Exec(deleteSQL, materialId)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+func SearchMaterialByName(keyword string, limit int64, offset int64) ([]*Material, error) {
+	searchSQL := "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
+	searchSQL += "material_type FROM material_library WHERE name LIKE '%" + keyword + "%'  LIMIT ? OFFSET ?"
+	rows, err := db.Query(searchSQL, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]*Material, 0, limit)
+	for rows.Next() {
+		material := new(Material)
+		var cover, name, url, sha, version, mateInfo, createdAt sql.NullString
+		err := rows.Scan(&material.ID, &cover, &name, &url, &sha, &version, &mateInfo, &material.HiddenAt,
+			&createdAt, &material.MaterialType)
+		if err != nil {
+			return nil, err
+		}
+		material.Cover = cover.String
+		material.Name = name.String
+		material.URL = url.String
+		material.Sha = sha.String
+		material.Version = version.String
+		material.MateInfo = mateInfo.String
+		material.CreatedAt = createdAt.String
+		result = append(result, material)
+	}
+
+	return result, nil
+}
+
 func GetMaterialByIds(materialIds []interface{}) ([]*Material, error) {
 	length := len(materialIds)
 	if length > len(materialBatachStmts) {
@@ -110,6 +150,11 @@ func GetMaterialByIds(materialIds []interface{}) ([]*Material, error) {
 	}
 
 	return result, nil
+}
+
+func UpdateMaterial(materialId int64, cover, name, url, sha, version, mateInfo string, hiddenAt int, createdAt string, materialType int) error {
+	_, err := db.Exec("UPDATE matrial_library SET cover = ?, name = ?, url = ?, sha = ?, version = ?, mate_info = ?, hidden_at = ?, created_at = ?, material_type = ? WHERE id = ?", cover, name, url, sha, version, mateInfo, hiddenAt, createdAt, materialType, materialId)
+	return err
 }
 
 func Init() (err error) {
