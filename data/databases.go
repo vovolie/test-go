@@ -31,7 +31,7 @@ type Material struct {
 	CreatedAt    string `json:"created_at"`
 }
 
-func GetMaterialById(materialId int) (*Material, error) {
+func GetMaterialById(materialId string) (*Material, error) {
 	stmt, err := db.Prepare("SELECT id, material_type, cover, name, url, sha, version, mate_info, hidden_at, created_at FROM material_library WHERE id = ? LIMIT 1")
 	if err != nil {
 		log.Println("prepare sql error", err)
