@@ -20,7 +20,7 @@ var (
 
 type Material struct {
 	ID           int    `json:"id"`
-	MaterialType int    `json:"material_type"`
+	Category 	 int    `json:"category"`
 	Cover        string `json:"cover"`
 	Name         string `json:"name"`
 	URL          string `json:"url"`
@@ -31,8 +31,25 @@ type Material struct {
 	CreatedAt    string `json:"created_at"`
 }
 
-func GetMaterialById(materialId int) (*Material, error) {
-	stmt, err := db.Prepare("SELECT id, material_type, cover, name, url, sha, version, mate_info, hidden_at, created_at FROM material_library WHERE id = ? LIMIT 1")
+type Category struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
+}
+
+var CategoryList []Category
+
+
+func GetCategory(id string) Category {
+	for _, category := range CategoryList {
+		if category.ID == id {
+			return category
+		}
+	}
+	return Category{}
+}
+
+func GetMaterialById(materialId string) (*Material, error) {
+	stmt, err := db.Prepare("SELECT id, category, cover, name, url, sha, version, mate_info, hidden_at, created_at FROM material_library WHERE id = ? LIMIT 1")
 	if err != nil {
 		log.Println("prepare sql error", err)
 		return nil, err
@@ -40,9 +57,9 @@ func GetMaterialById(materialId int) (*Material, error) {
 	defer stmt.Close()
 
 	material := new(Material)
-	var id, materialType, hiddenAt int
+	var id, category, hiddenAt int
 	var cover, name, url, sha, version, mateInfo, createdAt sql.NullString
-	err = stmt.QueryRow(materialId).Scan(&id, &materialType, &cover, &name, &url, &sha, &version, &mateInfo, &hiddenAt, &createdAt)
+	err = stmt.QueryRow(materialId).Scan(&id, &category, &cover, &name, &url, &sha, &version, &mateInfo, &hiddenAt, &createdAt)
 	switch {
 	case err == sql.ErrNoRows:
 		log.Println("cannot get matrial data by id: ", materialId)
@@ -52,7 +69,7 @@ func GetMaterialById(materialId int) (*Material, error) {
 		return nil, err
 	default:
 		material.ID = id
-		material.MaterialType = materialType
+		material.Category = category
 		material.Cover = cover.String
 		material.Name = name.String
 		material.URL = url.String
@@ -62,15 +79,15 @@ func GetMaterialById(materialId int) (*Material, error) {
 		material.HiddenAt = hiddenAt
 		material.CreatedAt = createdAt.String
 	}
-
+	log.Println("im do ing")
 	return material, nil
 }
 
 func InsertMaterial(material *Material) error {
-	instertSQL := "INSERT INTO material_library(cover, name, url, sha, version, mate_info, hidden_at, created_at, material_type)"
+	instertSQL := "INSERT INTO material_library(cover, name, url, sha, version, mate_info, hidden_at, created_at, category)"
 	instertSQL += "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	_, err := db.Exec(instertSQL, material.Cover, material.Name, material.URL,
-		material.Sha, material.Version, material.MateInfo, material.HiddenAt, material.CreatedAt, material.MaterialType)
+		material.Sha, material.Version, material.MateInfo, material.HiddenAt, material.CreatedAt, material.Category)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -89,7 +106,7 @@ func DelMaterialById(materialId int) bool {
 
 func SearchMaterialByName(keyword string, limit int64, offset int64) ([]*Material, error) {
 	searchSQL := "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
-	searchSQL += "material_type FROM material_library WHERE name LIKE '%" + keyword + "%'  LIMIT ? OFFSET ?"
+	searchSQL += "category FROM material_library WHERE name LIKE '%" + keyword + "%'  LIMIT ? OFFSET ?"
 	rows, err := db.Query(searchSQL, limit, offset)
 	if err != nil {
 		return nil, err
@@ -100,7 +117,7 @@ func SearchMaterialByName(keyword string, limit int64, offset int64) ([]*Materia
 		material := new(Material)
 		var cover, name, url, sha, version, mateInfo, createdAt sql.NullString
 		err := rows.Scan(&material.ID, &cover, &name, &url, &sha, &version, &mateInfo, &material.HiddenAt,
-			&createdAt, &material.MaterialType)
+			&createdAt, &material.Category)
 		if err != nil {
 			return nil, err
 		}
@@ -116,6 +133,73 @@ func SearchMaterialByName(keyword string, limit int64, offset int64) ([]*Materia
 
 	return result, nil
 }
+
+func GetAllMaterial(limit int64, offset int64) ([]*Material, error) {
+	getSQL := "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
+	getSQL += "category FROM material_library LIMIT ? OFFSET ?"
+	rows, err := db.Query(getSQL, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]*Material, 0, limit)
+	for rows.Next() {
+		material := new(Material)
+		var cover, name, url, sha, version, mateInfo, createdAt sql.NullString
+		err := rows.Scan(&material.ID, &cover, &name, &url, &sha, &version, &mateInfo, &material.HiddenAt,
+			&createdAt, &material.Category)
+		if err != nil {
+			return nil, err
+		}
+		material.Cover = cover.String
+		material.Name = name.String
+		material.URL = url.String
+		material.Sha = sha.String
+		material.Version = version.String
+		material.MateInfo = mateInfo.String
+		material.CreatedAt = createdAt.String
+		result = append(result, material)
+	}
+
+	return result, nil
+}
+
+func GetMaterialByCategory(category int, limit, offset int64) ([]*Material, error) {
+	getSQL := "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
+	getSQL += "category FROM material_library WHERE category = ？"
+	stmt, err := db.Prepare(getSQL)
+	if err != nil {
+		log.Println("prepare sql error", err)
+		return nil, err
+	}
+	defer stmt.Close()
+	result := make([]*Material, 0, limit)
+	rows, err := stmt.Query(category)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		material := new(Material)
+		var cover, name, url, sha, version, mateInfo, createdAt sql.NullString
+		err := rows.Scan(&material.ID, &cover, &name, &url, &sha, &version, &mateInfo, &material.HiddenAt,
+			&createdAt, &material.Category)
+		if err != nil {
+			return nil, err
+		}
+		material.Cover = cover.String
+		material.Name = name.String
+		material.URL = url.String
+		material.Sha = sha.String
+		material.Version = version.String
+		material.MateInfo = mateInfo.String
+		material.CreatedAt = createdAt.String
+		result = append(result, material)
+	}
+
+	return result, nil
+
+}
+
 
 func GetMaterialByIds(materialIds []interface{}) ([]*Material, error) {
 	length := len(materialIds)
@@ -135,7 +219,7 @@ func GetMaterialByIds(materialIds []interface{}) ([]*Material, error) {
 		material := new(Material)
 		var cover, name, url, sha, version, mateInfo, createdAt sql.NullString
 		err := rows.Scan(&material.ID, &cover, &name, &url, &sha, &version, &mateInfo, &material.HiddenAt,
-			&createdAt, &material.MaterialType)
+			&createdAt, &material.Category)
 		if err != nil {
 			return nil, err
 		}
@@ -152,8 +236,18 @@ func GetMaterialByIds(materialIds []interface{}) ([]*Material, error) {
 	return result, nil
 }
 
-func UpdateMaterial(materialId int64, cover, name, url, sha, version, mateInfo string, hiddenAt int, createdAt string, materialType int) error {
-	_, err := db.Exec("UPDATE matrial_library SET cover = ?, name = ?, url = ?, sha = ?, version = ?, mate_info = ?, hidden_at = ?, created_at = ?, material_type = ? WHERE id = ?", cover, name, url, sha, version, mateInfo, hiddenAt, createdAt, materialType, materialId)
+
+func MaterialsToSliceInterface(materials []*Material) []interface{} {
+	materialsIFace := []interface{}{}
+	for _, material := range materials {
+		materialsIFace = append(materialsIFace, material)
+	}
+	return materialsIFace
+}
+
+
+func UpdateMaterial(materialId int64, cover, name, url, sha, version, mateInfo string, hiddenAt int, createdAt string, category int) error {
+	_, err := db.Exec("UPDATE matrial_library SET cover = ?, name = ?, url = ?, sha = ?, version = ?, mate_info = ?, hidden_at = ?, created_at = ?, category = ? WHERE id = ?", cover, name, url, sha, version, mateInfo, hiddenAt, createdAt, category, materialId)
 	return err
 }
 
@@ -163,8 +257,13 @@ func Init() (err error) {
 		return err
 	}
 
+	categoryMusic := Category{ID: "1", Name: "音乐" }
+	categoryDecorative := Category{ID: "2", Name: "贴纸"}
+
+	CategoryList = append(CategoryList, categoryMusic, categoryDecorative)
+
 	materialBaseSQL = "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
-	materialBaseSQL += "material_type FROM material_library WHERE "
+	materialBaseSQL += "category FROM material_library WHERE "
 	materialBatachStmts = make([]*sql.Stmt, 0, 300)
 	for i := 0; i < MaxMultiQueryCount; i++ {
 		clause := strings.TrimRight(strings.Repeat("?,", i+1), ",")
@@ -176,3 +275,4 @@ func Init() (err error) {
 	}
 	return
 }
+

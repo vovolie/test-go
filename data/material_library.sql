@@ -8,6 +8,6 @@ CREATE TABLE `material_library` (
   `mate_info` text,
   `hidden_at` int(11) NOT NULL DEFAULT '0',
   `created_at` datetime NOT NULL,
-  `material_type` int(11) NOT NULL,
+  `category` int(11) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
