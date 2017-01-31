@@ -7,6 +7,7 @@ import (
 )
 
 var materialType *graphql.Object
+var queryType *graphql.Object
 
 var nodeDefinitions *relay.NodeDefinitions
 var materialsConnection *relay.GraphQLConnectionDefinitions
@@ -21,9 +22,9 @@ func init() {
 			if resolvedID.Type == "Material" {
 				return GetMaterialById(resolvedID.ID)
 			}
-			if resolvedID.Type == "Category" {
-				return
-			}
+			//if resolvedID.Type == "Category" {
+			//	return
+			//}
 			return nil, nil
 		},
 		TypeResolve:func(p graphql.ResolveTypeParams) *graphql.Object {
@@ -40,7 +41,7 @@ func init() {
 		Name: "Material",
 		Fields: graphql.Fields{
 			"id": relay.GlobalIDField("Material", nil),
-			"Category": &graphql.Field{
+			"category": &graphql.Field{
 				Type: graphql.Int,
 			},
 			"cover": &graphql.Field{
@@ -76,9 +77,10 @@ func init() {
 		NodeType: materialType,
 	})
 
-	queryType := graphql.NewObject(graphql.ObjectConfig{
+	queryType = graphql.NewObject(graphql.ObjectConfig{
 		Name: "Query",
 		Fields: graphql.Fields{
+			"id": relay.GlobalIDField("Material", nil),
 			"material": &graphql.Field{
 				Type: materialType,
 				Args: graphql.FieldConfigArgument{
@@ -95,13 +97,42 @@ func init() {
 					return Material{}, nil
 				},
 			},
+			"materials": &graphql.Field{
+				Type: materialsConnection.ConnectionType,
+				Args: relay.NewConnectionArgs(graphql.FieldConfigArgument{
+					"id": &graphql.ArgumentConfig{
+						Type: graphql.String,
+						DefaultValue: "1",
+					},
+				}),
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					idCat, _ := p.Args["id"].(string)
+					args := relay.NewConnectionArguments(p.Args)
+					tmpMaterials, _ := GetMaterialByCategory(idCat, 10, 0)
+					ms := MaterialsToSliceInterface(tmpMaterials)
+					return relay.ConnectionFromArray(ms, args), nil
+				},
+			},
+		},
+		Interfaces: []*graphql.Interface{nodeDefinitions.NodeInterface},
+	})
+
+	rootType := graphql.NewObject(graphql.ObjectConfig{
+		Name: "Root",
+		Fields: graphql.Fields{
+			"all": &graphql.Field{
+				Type: queryType,
+				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+					return GetAllMaterial(10, 0)
+				},
+			},
 			"node": nodeDefinitions.NodeField,
 		},
 	})
 
 	var err error
 	Schema, err = graphql.NewSchema(graphql.SchemaConfig{
-		Query: queryType,
+		Query: rootType,
 	})
 
 	if err != nil {

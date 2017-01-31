@@ -2,12 +2,12 @@ package data
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
+	"fmt"
 )
 
 var (
@@ -79,7 +79,6 @@ func GetMaterialById(materialId string) (*Material, error) {
 		material.HiddenAt = hiddenAt
 		material.CreatedAt = createdAt.String
 	}
-	log.Println("im do ing")
 	return material, nil
 }
 
@@ -164,17 +163,17 @@ func GetAllMaterial(limit int64, offset int64) ([]*Material, error) {
 	return result, nil
 }
 
-func GetMaterialByCategory(category int, limit, offset int64) ([]*Material, error) {
-	getSQL := "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
-	getSQL += "category FROM material_library WHERE category = ？"
-	stmt, err := db.Prepare(getSQL)
+func GetMaterialByCategory(category string, limit, offset int64) ([]*Material, error) {
+	catSQL := "SELECT id, cover, name, url, sha, version, mate_info, hidden_at, UNIX_TIMESTAMP(created_at) AS created_at,"
+	catSQL += "category FROM material_library WHERE category=?"
+	catStmt, err := db.Prepare(catSQL)
 	if err != nil {
 		log.Println("prepare sql error", err)
 		return nil, err
 	}
-	defer stmt.Close()
+	defer catStmt.Close()
 	result := make([]*Material, 0, limit)
-	rows, err := stmt.Query(category)
+	rows, err := catStmt.Query(category)
 	if err != nil {
 		return nil, err
 	}
